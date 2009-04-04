@@ -5,7 +5,7 @@ use warnings;
 
 use vars qw($VERSION);
 
-$VERSION = '1.0';
+$VERSION = '1.1';
 
 use Cwd qw(getcwd abs_path);
 use File::Temp qw(tempdir);
@@ -14,6 +14,7 @@ use File::Path;
 use Data::Dumper;
 use Archive::Tar;
 use Archive::Zip;
+use YAML qw(LoadFile);
 use Safe;
 # safe to load, load now because it's commonly used for $VERSION
 use version;
@@ -213,9 +214,58 @@ sub modules {
         $self->{_modules_runs}++;
         my $tempdir = _unarchive($self->{file});
 
+        my $meta = (File::Find::Rule->file()->name('META.yml')->in($tempdir))[0];
+        my $ignore = join('|', qw(t inc xt));
+        my %ignorefiles;
+        my %ignorepackages;
+        my %ignorenamespaces;
+        if($meta && -e $meta) {
+            my $yaml = eval { LoadFile($meta); };
+            if(!$@ &&
+                UNIVERSAL::isa($yaml, 'HASH') &&
+                exists($yaml->{no_index}) &&
+                UNIVERSAL::isa($yaml->{no_index}, 'HASH')
+            ) {
+                if(exists($yaml->{no_index}->{directory})) {
+                    if(eval { @{$yaml->{no_index}->{directory}} }) {
+                        $ignore = join('|', $ignore,
+                            @{$yaml->{no_index}->{directory}}
+                        );
+                    } elsif(!ref($yaml->{no_index}->{directory})) {
+                         $ignore .= '|'.$yaml->{no_index}->{directory}
+                    }
+                }
+                if(exists($yaml->{no_index}->{file})) {
+                    if(eval { @{$yaml->{no_index}->{file}} }) {
+                        %ignorefiles = map { $_, 1 }
+                            @{$yaml->{no_index}->{file}};
+                    } elsif(!ref($yaml->{no_index}->{file})) {
+                         $ignorefiles{$yaml->{no_index}->{file}} = 1;
+                    }
+                }
+                if(exists($yaml->{no_index}->{package})) {
+                    if(eval { @{$yaml->{no_index}->{package}} }) {
+                        %ignorepackages = map { $_, 1 }
+                            @{$yaml->{no_index}->{package}};
+                    } elsif(!ref($yaml->{no_index}->{package})) {
+                         $ignorepackages{$yaml->{no_index}->{package}} = 1;
+                    }
+                }
+                if(exists($yaml->{no_index}->{namespace})) {
+                    if(eval { @{$yaml->{no_index}->{namespace}} }) {
+                        %ignorenamespaces = map { $_, 1 }
+                            @{$yaml->{no_index}->{namespace}};
+                    } elsif(!ref($yaml->{no_index}->{namespace})) {
+                         $ignorenamespaces{$yaml->{no_index}->{namespace}} = 1;
+                    }
+                }
+            }
+        }
         # find modules
         my @PMs = grep {
-            $_ !~ m{^\Q$tempdir\E/[^/]+/(t|inc|xt)}
+            my $pm = $_;
+            $pm !~ m{^\Q$tempdir\E/[^/]+/($ignore)} &&
+            !grep { $pm =~ m{^\Q$tempdir\E/[^/]+/$_$} } (keys %ignorefiles)
         } File::Find::Rule->file()->name('*.pm')->in($tempdir);
         foreach my $PM (@PMs) {
             local $/ = undef;
@@ -227,7 +277,10 @@ sub modules {
             # from PAUSE::pmfile::packages_per_pmfile in mldistwatch.pm
             if($PM =~ /\bpackage[ \t]+([\w\:\']+)\s*($|[};])/) {
                 my $module = $1;
-                $self->{modules}->{$module} = $version;
+                $self->{modules}->{$module} = $version unless(
+                    exists($ignorepackages{$module}) ||
+                    (grep { $module =~ /${_}::/ } keys %ignorenamespaces)
+                );
             }
         }
         rmtree($tempdir);
@@ -288,6 +341,8 @@ test suite.
 =head1 SEE ALSO
 
 L<http://pause.perl.org/>
+
+L<dumpcpandist>
 
 =head1 AUTHOR, COPYRIGHT and LICENCE
 
