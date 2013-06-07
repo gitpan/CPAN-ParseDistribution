@@ -4,13 +4,16 @@ use warnings;
 WriteMakefile(
     NAME         => 'CPAN::ParseDistribution',
     META_MERGE => {
-        license => 'other',
-        resource => {
-	    repository => 'https://github.com/DrHyde/perl-modules-CPAN-ParseDistribution'
+        resources => {
+            repository => {
+                web  => 'https://github.com/DrHyde/perl-modules-CPAN-ParseDistribution',
+                type => 'git',
+            }
         }
     },
     VERSION_FROM => 'lib/CPAN/ParseDistribution.pm',
     PREREQ_PM    => {
+        'Test::More'   => '0.88', # done_testing
         'Archive::Tar' => 0,
         'Archive::Zip' => 0,
         'File::Find::Rule' => 0,
@@ -18,7 +21,7 @@ WriteMakefile(
         'File::Temp' => 0,
         'File::Path' => 0,
         'Parallel::ForkManager' => 1.03,
-        # 'version'    => 0,
+        'Devel::CheckOS'        => 0,
     },
     EXE_FILES => [qw(
         bin/dumpcpandist

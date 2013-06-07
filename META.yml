@@ -7,7 +7,7 @@ build_requires:
 configure_requires:
   ExtUtils::MakeMaker: 0
 dynamic_config: 1
-generated_by: 'ExtUtils::MakeMaker version 6.66, CPAN::Meta::Converter version 2.120921'
+generated_by: 'ExtUtils::MakeMaker version 6.6302, CPAN::Meta::Converter version 2.120630'
 license: unknown
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -20,11 +20,12 @@ no_index:
 requires:
   Archive::Tar: 0
   Archive::Zip: 0
+  Devel::CheckOS: 0
   File::Find::Rule: 0
   File::Path: 0
   File::Temp: 0
   Parallel::ForkManager: 1.03
+  Test::More: 0.88
   YAML: 0.6
-version: 1.5
-x_resource:
-  repository: https://github.com/DrHyde/perl-modules-CPAN-ParseDistribution
+resources: {}
+version: 1.51

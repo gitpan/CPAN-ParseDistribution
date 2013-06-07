@@ -5,7 +5,7 @@ use warnings;
 
 use vars qw($VERSION);
 
-$VERSION = '1.5';
+$VERSION = '1.51';
 
 use Cwd qw(getcwd abs_path);
 use File::Temp qw(tempdir);
@@ -17,6 +17,7 @@ use Archive::Zip;
 use YAML qw(LoadFile);
 use Safe;
 use Parallel::ForkManager;
+use Devel::CheckOS qw(os_is);
 
 $Archive::Tar::DO_NOT_USE_PREFIX = 1;
 $Archive::Tar::CHMOD = 0;
@@ -183,24 +184,7 @@ sub _parse_version_safely {
                 }; \$$var
             };
 
-            my $fork_manager = Parallel::ForkManager->new(1);
-
-            # to retrieve data returned from child
-            $fork_manager->run_on_finish(sub { $result = $_[-1]; });
-
-            # checking time instead of saying run_on_wait(..., 5) if because of
-            # differences between 5.8.x and 5.18 (god knows when the difference came in)
-            my($start_time, $timed_out, $pid) = (time(), 0);
-            $fork_manager->run_on_wait(sub { if(time() - $start_time >= 5) { $timed_out = 1; kill(15, $pid) } }, 0.01);
-
-            $pid = $fork_manager->start() || do {
-                my $v = eval { $c->reval($eval) };
-                if($@) { $result = { error => $@ }; }
-                 else { $result = { result => $v }; }
-                $fork_manager->finish(0, $result);
-            };
-            $fork_manager->wait_all_children();
-            $result->{error} = 'Safe compartment timed out' if($timed_out);
+            $result = _run_safely($c, $eval);
         };
         # stuff that's my fault because of the Safe compartment
         if($result->{error} && $result->{error} =~ /trapped by operation mask|safe compartment timed out/i) {
@@ -219,6 +203,19 @@ sub _parse_version_safely {
     close $fh;
 
     return exists($result->{result}) ? $result->{result} : undef;
+}
+
+sub _run_safely {
+    if(os_is('Unix')) {
+        eval 'use CPAN::ParseDistribution::Unix';
+        return CPAN::ParseDistribution::Unix->_run(@_);
+    } elsif(os_is('MicrosoftWindows')) {
+        # FIXME once someone supplies CPAN::ParseDistribution::Windows
+        warn("Windows is not fully supported by CPAN::ParseDistribution\n");
+        warn("See the LIMITATIONS section in the documentation\n");
+        eval 'use CPAN::ParseDistribution::Unix';
+        return CPAN::ParseDistribution::Unix->_run(@_);
+    }
 }
 
 =head2 isdevversion
@@ -368,11 +365,16 @@ code and to run it in a very heavily restricted user account.
 =head1 LIMITATIONS, BUGS and FEEDBACK
 
 I welcome feedback about my code, including constructive criticism.
-Bug reports should be made using L<http://rt.cpan.org/> or by email,
+Bug reports should be made using L<Github Issues|https://github.com/DrHyde/perl-modules-CPAN-ParseDistribution/issues>
 and should include the smallest possible chunk of code, along with
 any necessary data, which demonstrates the bug.  Ideally, this
 will be in the form of files which I can drop in to the module's
 test suite.
+
+There is a known problem with parsing some pathological distributions
+on Windows, where CPAN::ParseDistribution may either hang or crash. This
+is because Windows doesn't properly support fork()ing and signals. I can
+not fix this, but welcome patches with tests.
 
 =cut
 
