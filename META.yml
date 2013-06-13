@@ -27,5 +27,7 @@ requires:
   Parallel::ForkManager: 1.03
   Test::More: 0.88
   YAML: 0.6
-resources: {}
-version: 1.51
+resources:
+  bugtracker: https://github.com/DrHyde/perl-modules-CPAN-ParseDistribution/issues
+  repository: https://github.com/DrHyde/perl-modules-CPAN-ParseDistribution
+version: 1.52
